@@ -16,11 +16,19 @@
  */
 package com.ning.http.client.providers.netty;
 
-import com.ning.http.client.AsyncHandler;
-import com.ning.http.client.AsyncHttpClientConfig;
-import com.ning.http.client.Request;
-import com.ning.http.util.AllowAllHostnameVerifier;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.channels.ClosedChannelException;
+
+import javax.net.ssl.HostnameVerifier;
+
 import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
@@ -29,13 +37,10 @@ import org.jboss.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.HostnameVerifier;
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.nio.channels.ClosedChannelException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.ning.http.client.AsyncHandler;
+import com.ning.http.client.AsyncHttpClientConfig;
+import com.ning.http.client.Request;
+import com.ning.http.util.AllowAllHostnameVerifier;
 
 
 /**
@@ -68,6 +73,17 @@ final class NettyConnectListener<T> implements ChannelFutureListener {
             if (!handshakeDone.getAndSet(true) && (sslHandler != null)) {
                 ((SslHandler) channel.getPipeline().get(NettyAsyncHttpProvider.SSL_HANDLER)).handshake().addListener(this);
                 return;
+            }
+
+            try {
+                if (config.getProxyServer() != null && config.getProxyServer().isSocks()) {
+                channel.getPipeline().addFirst("socks", new NettySocksHandler(future, nettyRequest.getUri()));
+                channel.write(ChannelBuffers.wrappedBuffer(NettySocksHandler.VERSION_AUTH));
+                logger.debug("Written SOCKS auth bytes to channel.");
+                return;
+                }
+            } catch (URISyntaxException e) {
+                throw new ConnectException("URISyntaxException exception: " + nettyRequest.getUri());
             }
 
             HostnameVerifier v = config.getHostnameVerifier();

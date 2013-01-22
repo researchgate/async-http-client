@@ -52,13 +52,19 @@ public class ProxyServer {
     private final String password;
     private int port;
     private String ntlmDomain = System.getProperty("http.auth.ntlm.domain", "");
+    private final boolean isSocks;
 
-    public ProxyServer(final Protocol protocol, final String host, final int port, String principal, String password) {
+    public ProxyServer(final Protocol protocol, final String host, final int port, String principal, String password, boolean isSocks) {
         this.protocol = protocol;
         this.host = host;
         this.port = port;
         this.principal = principal;
         this.password = password;
+        this.isSocks = isSocks;
+    }
+
+    public ProxyServer(final Protocol protocol, final String host, final int port, String principal, String password) {
+        this(protocol, host, port, principal, password, false);
     }
 
     public ProxyServer(final String host, final int port, String principal, String password) {
@@ -132,6 +138,10 @@ public class ProxyServer {
     @Override
     public String toString() {
         return String.format("%s://%s:%d", protocol.toString(), host, port);
+    }
+
+    public boolean isSocks() {
+        return isSocks;
     }
 }
 
